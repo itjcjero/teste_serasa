@@ -1,0 +1,51 @@
+- hosts: myhost
+  roles:
+    - role: network
+      network_ether_interfaces:
+       - device: eth1
+         bootproto: static
+         cidr: 192.168.10.18/24
+         gateway: auto
+         route:
+          - network: 192.168.200.0
+            netmask: 255.255.255.0
+            gateway: 192.168.10.1
+          - network: 192.168.100.0
+            netmask: 255.255.255.0
+            gateway: 192.168.10.1
+
+
+- name: removendo bibliotecas Zabbix-Agent
+  action: raw dpkg --purge zabbix-release && dpkg --purge zabbix-agent
+  when: ipack.stdout != "1"
+
+
+- name: baixar biblioteca Zabbix-Agent 5.2
+  action: raw wget https://repo.zabbix.com/zabbix/5.2/"{{ SO.stdout }}"/pool/main/z/zabbix-release_5.2-1+debian9"{{ SOVERSION.stdout }}"_all.deb
+  
+- name: Executando novos repositorios .deb
+  action: raw dpkg -i zabbix-release_5.2-1+debian9"{{ SOVERSION.stdout }}"_all.deb
+
+
+- name: Atualizando repositorios
+  action: raw apt-get update
+
+
+- name: instalar agent-zabbix
+  apt:
+    name: zabbix-agent
+    state: installed
+       
+- name: copia arquivo de configuracao do zabbix-agent
+  copy:
+    src: zabbix/zabbix_agentd.conf
+    dest: /etc/zabbix/
+
+- name: adicionar nome do host
+  action: raw sed -i "s/Hostname=zabbix/Hostname="{{ hname.stdout }}"/g" /etc/zabbix/zabbix_agentd.conf
+
+- name: iniciar agente zabbix
+  service:
+    name: zabbix-agent
+    state: started
+    enabled: yes
